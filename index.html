@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>🌍 Crowdsourced VPN Platform</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .admin-link { background: #007bff; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold; }
+        .admin-link:hover { background: #0056b3; }
+        .contribute-link { background: #ff9800; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-weight: bold; margin-right: 10px; }
+        .contribute-link:hover { background: #e68900; }
+        .router-card { border: 1px solid #ddd; padding: 15px; margin: 10px; display: inline-block; width: 260px; vertical-align: top; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: 0.2s; }
+        .online { border-left: 5px solid #28a745; background-color: #f0fff0; }
+        .offline { background: #e9ecef; border-left: 5px solid #6c757d; opacity: 0.7; filter: grayscale(0.1); }
+        .speed { font-weight: bold; color: #007bff; }
+        button { margin-top: 10px; background: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        button:hover:not(:disabled) { background: #218838; }
+        #credModal {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 2px solid #333;
+            padding: 20px;
+            z-index: 1000;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3);
+            border-radius: 8px;
+            min-width: 300px;
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+        .cred-item { margin: 10px 0; word-break: break-all; }
+        .copy-btn { margin-left: 10px; padding: 2px 8px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .close-btn { float: right; cursor: pointer; font-weight: bold; font-size: 20px; }
+        .disclaimer {
+            margin-top: 40px;
+            padding: 15px 20px;
+            background: #fef7e0;
+            border-top: 1px solid #e0d5b7;
+            border-bottom: 1px solid #e0d5b7;
+            text-align: center;
+            font-size: 13px;
+            color: #6c757d;
+            border-radius: 6px;
+        }
+        .intro {
+            background: #fff3e0;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 5px solid #ff9800;
+        }
+        .intro h3 { margin-top: 0; }
+        .intro a { color: #007bff; text-decoration: none; }
+        .filter-bar { margin: 15px 0; text-align: left; }
+        .filter-bar select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; min-width: 200px; }
+        .toggle-bar { text-align: right; margin: 10px 0; }
+        .toggle-btn { background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        .last-used { font-size: 11px; color: #999; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌍 Crowdsourced VPN Platform</h1>
+        <div>
+            <a href="contribute.php" class="contribute-link">🤝 Become a Node</a>
+            <a href="admin.html" class="admin-link">🔧 Admin Portal</a>
+        </div>
+    </div>
+
+    <div class="intro">
+        <h3>📘 What is OpenVPN?</h3>
+        <p>🔒 OpenVPN is a secure and flexible VPN protocol that creates encrypted tunnels between your device and the VPN server. 
+        To use this service, you need an OpenVPN client (e.g., <a href="https://openvpn.net/client/" target="_blank">OpenVPN Connect</a> 
+        or <a href="https://tunnelblick.net/" target="_blank">Tunnelblick</a> on macOS, 
+        or the official OpenVPN client for Windows/Linux).</p>
+        <p><strong>📋 How to connect:</strong><br>
+        1️⃣ Request credentials for an online router below.<br>
+        2️⃣ Download the OpenVPN configuration file (provided after credential request).<br>
+        3️⃣ Import the .ovpn file into your OpenVPN client and enter the username/password.<br>
+        4️⃣ Connect and enjoy private, decentralized VPN access.</p>
+        <p>✨ <em>This platform is free and crowdsourced – contributed by volunteers.</em></p>
+    </div>
+
+    <div class="filter-bar">
+        <label>🌐 Filter by Country/Region: </label>
+        <select id="countryFilter">
+            <option value="">All Countries</option>
+        </select>
+    </div>
+
+    <div class="toggle-bar">
+        <button id="toggleOfflineBtn" class="toggle-btn" onclick="toggleOffline()">🙈 Hide Offline Routers</button>
+    </div>
+
+    <div id="routers-container"></div>
+
+    <!-- Credential Modal -->
+    <div id="overlay" class="overlay"></div>
+    <div id="credModal">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <h3>🔐 Your VPN Credentials</h3>
+        <div class="cred-item">
+            <strong>👤 Username:</strong> <span id="credUsername"></span>
+            <button class="copy-btn" onclick="copyToClipboard('credUsername')">📋 Copy</button>
+        </div>
+        <div class="cred-item">
+            <strong>🔑 Password:</strong> <span id="credPassword"></span>
+            <button class="copy-btn" onclick="copyToClipboard('credPassword')">📋 Copy</button>
+        </div>
+        <div class="cred-item">
+            <strong>🌐 Server IP/Domain:</strong> <span id="credServer"></span>
+            <button class="copy-btn" onclick="copyToClipboard('credServer')">📋 Copy</button>
+        </div>
+        <div class="cred-item">
+            <strong>🔌 Port:</strong> <span id="credPort"></span>
+            <button class="copy-btn" onclick="copyToClipboard('credPort')">📋 Copy</button>
+        </div>
+        <div class="cred-item">
+            <strong>📄 OpenVPN Config:</strong>
+            <a id="configDownloadLink" href="#" target="_blank">⬇️ Download .ovpn file</a>
+        </div>
+        <button onclick="closeModal()">❌ Close</button>
+    </div>
+
+    <div class="disclaimer">
+        <strong>🎁 Free to Use – No strings attached.</strong> This platform is provided as a proof-of-concept crowdsourced VPN service. 
+        By using this service, you agree to use it responsibly and comply with all applicable laws. 
+        The network is contributed by volunteers; we do not guarantee speed, availability, or anonymity.
+    </div>
+
+    <script>
+        let showOffline = true;
+        let allRouters = [];
+        let countrySet = new Set();
+
+        // Predefined list of countries/regions (including the three special ones)
+        const predefinedCountries = [
+            "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+            "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi",
+            "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Côte d'Ivoire", "Croatia", "Cuba", "Cyprus", "Czech Republic",
+            "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+            "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+            "Fiji", "Finland", "France",
+            "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana",
+            "Haiti", "Honduras", "Hong Kong, China", "Hungary",
+            "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy",
+            "Jamaica", "Japan", "Jordan",
+            "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan",
+            "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg",
+            "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+            "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway",
+            "Oman",
+            "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal",
+            "Qatar",
+            "Romania", "Russia", "Rwanda",
+            "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
+            "Taiwan, China", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu",
+            "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan",
+            "Vanuatu", "Vatican City", "Venezuela", "Vietnam",
+            "Yemen",
+            "Zambia", "Zimbabwe",
+            "Macao, China"
+        ];
+
+        function populateCountryFilter(routers) {
+            routers.forEach(router => {
+                if (router.country) countrySet.add(router.country);
+            });
+            predefinedCountries.forEach(c => countrySet.add(c));
+            const select = document.getElementById('countryFilter');
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">All Countries</option>';
+            Array.from(countrySet).sort().forEach(country => {
+                const option = document.createElement('option');
+                option.value = country;
+                option.textContent = country;
+                select.appendChild(option);
+            });
+            select.value = currentValue;
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return 'Never';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+		function filterAndDisplay() {
+			const selectedCountry = document.getElementById('countryFilter').value;
+			let filtered = allRouters;
+			if (selectedCountry) {
+				filtered = allRouters.filter(r => r.country === selectedCountry);
+			}
+			if (!showOffline) {
+				filtered = filtered.filter(r => r.is_online == 1);
+			}
+			const container = document.getElementById('routers-container');
+			container.innerHTML = '';
+			if (filtered.length === 0) {
+				container.innerHTML = '<p style="text-align:center; margin-top:50px;">😞 No routers match the current filter.</p>';
+				return;
+			}
+			filtered.forEach(router => {
+				const isOnline = router.is_online == 1;
+				const lastUsed = router.last_requested_at ? formatDateTime(router.last_requested_at) : 'Never';
+				const lastSeen = router.last_seen ? formatDateTime(router.last_seen) : 'Never';
+				const timeText = isOnline ? `🕒 Last used: ${lastUsed}` : `📡 Last online: ${lastSeen}`;
+				
+				const card = document.createElement('div');
+				card.className = `router-card ${isOnline ? 'online' : 'offline'}`;
+				card.innerHTML = `
+					<h3>${escapeHtml(router.name)} (${escapeHtml(router.country)})</h3>
+					<p>⚡ Speed: <span class="speed">${router.current_speed_mbps} Mbps</span></p>
+					<p>📡 Status: ${isOnline ? '✅ Online' : '❌ Offline'}</p>
+					<div class="last-used">${timeText}</div>
+					${isOnline ? `<button onclick="requestCredentials(${router.id})">🔑 Get Credentials</button>` : `<button disabled style="background:#6c757d;">🔑 Unavailable</button>`}
+					<br>
+					<small><a href="/api/index.php?action=download_config&router_id=${router.id}" target="_blank">📁 Download Config (if available)</a></small>
+				`;
+				container.appendChild(card);
+			});
+		}
+
+        function fetchRouters() {
+            fetch('/api/index.php?action=routers')
+                .then(res => res.json())
+                .then(routers => {
+                    allRouters = routers;
+                    populateCountryFilter(routers);
+                    filterAndDisplay();
+                })
+                .catch(err => console.error('Fetch routers error:', err));
+        }
+
+        function toggleOffline() {
+            showOffline = !showOffline;
+            const btn = document.getElementById('toggleOfflineBtn');
+            btn.innerText = showOffline ? '🙈 Hide Offline Routers' : '🐵 Show Offline Routers';
+            filterAndDisplay();
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        function requestCredentials(routerId) {
+            fetch('/api/index.php?action=request_credentials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ router_id: routerId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert('❌ Error: ' + data.error);
+                } else {
+                    document.getElementById('credUsername').innerText = data.username;
+                    document.getElementById('credPassword').innerText = data.password;
+                    document.getElementById('credServer').innerText = data.server_ip;
+                    document.getElementById('credPort').innerText = data.port;
+                    document.getElementById('configDownloadLink').href = `/api/index.php?action=download_config&router_id=${routerId}`;
+                    document.getElementById('overlay').style.display = 'block';
+                    document.getElementById('credModal').style.display = 'block';
+                    // Refresh routers to update last used time
+                    fetchRouters();
+                }
+            })
+            .catch(err => {
+                console.error('Request credentials error:', err);
+                alert('⚠️ Failed to request credentials.');
+            });
+        }
+
+        function closeModal() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('credModal').style.display = 'none';
+        }
+
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => alert('✅ Copied')).catch(() => fallbackCopy(text));
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('✅ Copied');
+        }
+
+        document.getElementById('countryFilter').addEventListener('change', filterAndDisplay);
+        setInterval(fetchRouters, 5000);
+        fetchRouters();
+    </script>
+</body>
+</html>

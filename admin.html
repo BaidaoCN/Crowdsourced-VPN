@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Manage VPN Routers</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; }
+        .logout-btn { background: #dc3545; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; }
+        .form-container { margin-bottom: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        input, button { margin: 5px; padding: 5px; }
+        .login-container { max-width: 300px; margin: 100px auto; background: white; padding: 20px; border-radius: 8px; }
+        .error { color: red; }
+        .tab { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
+        .tab button { background-color: #f1f1f1; float: left; border: none; outline: none; cursor: pointer; padding: 10px 16px; transition: 0.3s; margin-right: 5px; position: relative; }
+        .tab button.active { background-color: #ddd; }
+        .tabcontent { display: none; }
+        .tabcontent.active { display: block; }
+        .badge {
+            background-color: #dc3545;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 12px;
+            margin-left: 5px;
+            display: inline-block;
+        }
+        .toggle-buttons button {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-right: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .toggle-buttons button.active-toggle {
+            background-color: #007bff;
+        }
+        .clear-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-left: 15px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .filter-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-left: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .action-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 2px;
+        }
+        .action-btn.add {
+            background-color: #28a745;
+        }
+        .delete-icon {
+            background: none;
+            border: none;
+            color: #dc3545;
+            font-size: 18px;
+            cursor: pointer;
+            margin-left: 8px;
+            padding: 0 4px;
+        }
+        .delete-icon:hover {
+            color: #a71d2a;
+        }
+        .unread-row {
+            background-color: #fff3cd;
+        }
+    </style>
+</head>
+<body>
+<div id="admin-content" style="display: none;">
+    <div class="header">
+        <h2>Admin: Router Management</h2>
+        <button class="logout-btn" onclick="logout()">🔒 Logout</button>
+    </div>
+
+    <div class="tab">
+        <button class="tablinks" onclick="openTab(event, 'routers')" id="defaultOpen">📡 Existing Routers</button>
+        <button class="tablinks" onclick="openTab(event, 'pending')" id="pendingTabBtn">⏳ Pending Approvals</button>
+        <button class="tablinks" onclick="openTab(event, 'messages')" id="messagesTabBtn">💬 Messages</button>
+        <button class="tablinks" onclick="openTab(event, 'accesslogs')">📜 Access Logs</button>
+    </div>
+
+    <!-- Existing Routers Tab -->
+    <div id="routers" class="tabcontent">
+        <div class="form-container">
+            <h3>➕ Add New Router</h3>
+            <input type="text" id="name" placeholder="Name" required>
+            <input type="text" id="country" list="countriesList" placeholder="Country or Region" required>
+            <datalist id="countriesList"></datalist>
+            <input type="text" id="ip_address" placeholder="Domain Name or IP (e.g., vpn.example.com or 1.2.3.4)" required>
+            <input type="text" id="ssh_port" placeholder="SSH Port (22)" value="22">
+            <input type="text" id="openvpn_port" placeholder="OpenVPN Port (1194)" value="1194">
+            <input type="password" id="ssh_password" placeholder="SSH Password" required>
+            <input type="file" id="config_file" accept=".ovpn,.conf">
+            <button class="action-btn add" onclick="addRouter()">➕ Add Router</button>
+        </div>
+        <div id="router-list">
+            <h3>📋 Existing Routers</h3>
+            <table id="routers-table">
+                <thead>
+                    <tr><th>ID</th><th>Name</th><th>Country</th><th>IP/Domain</th><th>Config</th><th>Added At</th><th>Actions</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pending Approvals Tab -->
+    <div id="pending" class="tabcontent">
+        <h3>📋 Router Submission Records</h3>
+        <div class="toggle-buttons">
+            <button id="showPendingBtn" class="active-toggle" onclick="showPendingList()">📋 Show Pending</button>
+            <button id="showDeniedBtn" onclick="showDeniedList()">🚫 Show Denied</button>
+            <button id="showApprovedBtn" onclick="showApprovedList()">✅ Show Approved</button>
+            <button id="clearAllBtn" class="clear-btn" onclick="clearAllSubmissions()">🗑️ Clear All Submissions</button>
+        </div>
+        <div id="pendingListContainer">
+            <table id="pending-table">
+                <thead>
+                    <tr><th>ID</th><th>Name</th><th>Country</th><th>IP/Domain</th><th>Submitted At</th><th>Approved/Denied At</th><th>Actions</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Messages Tab -->
+    <div id="messages" class="tabcontent">
+        <h3>💬 Contact Messages</h3>
+        <div style="margin-bottom: 10px;">
+            <button onclick="deleteAllMessages()" class="clear-btn">🗑️ Delete All Messages</button>
+        </div>
+        <table id="messages-table">
+            <thead>
+                <tr><th>ID</th><th>Name</th><th>Email</th><th>Message</th><th>Received</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Access Logs Tab -->
+    <div id="accesslogs" class="tabcontent">
+        <h3>📜 Access Logs</h3>
+        <div style="margin-bottom: 10px;">
+            <label>🔍 Filter by Router: </label>
+            <select id="logRouterFilter">
+                <option value="">All Routers</option>
+            </select>
+            <button onclick="fetchAccessLogs()" class="filter-btn">🔍 Apply Filter</button>
+            <button onclick="deleteAllAccessLogs()" class="clear-btn" style="margin-left: 20px;">🗑️ Delete All Logs</button>
+        </div>
+        <table id="accesslogs-table">
+            <thead>
+                <tr><th>ID</th><th>Router</th><th>Username</th><th>Assigned At</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="login-container" class="login-container">
+    <h3>🔐 Admin Login</h3>
+    <input type="text" id="login-username" placeholder="Username">
+    <input type="password" id="login-password" placeholder="Password">
+    <button onclick="login()">🔑 Login</button>
+    <div id="login-error" class="error"></div>
+</div>
+
+<script>
+let sessionActive = false;
+let currentListMode = 'pending';
+let unreadMessagesCount = 0;
+
+// Predefined allowed countries (same as before – keep full list)
+const allowedCountries = [
+    "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+    "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi",
+    "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Côte d'Ivoire", "Croatia", "Cuba", "Cyprus", "Czech Republic",
+    "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+    "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+    "Fiji", "Finland", "France",
+    "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana",
+    "Haiti", "Honduras", "Hong Kong, China", "Hungary",
+    "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy",
+    "Jamaica", "Japan", "Jordan",
+    "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan",
+    "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg",
+    "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+    "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway",
+    "Oman",
+    "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal",
+    "Qatar",
+    "Romania", "Russia", "Rwanda",
+    "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
+    "Taiwan, China", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu",
+    "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan",
+    "Vanuatu", "Vatican City", "Venezuela", "Vietnam",
+    "Yemen",
+    "Zambia", "Zimbabwe",
+    "Macao, China"
+];
+
+// ==================== LOGIN / SESSION ====================
+function login() {
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    fetch('/api/index.php?action=login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            sessionActive = true;
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('admin-content').style.display = 'block';
+            populateCountryDatalist();
+            fetchRouters();
+            updatePendingBadge();
+            updateMessagesBadge();
+            openTab(null, 'routers');
+            startBadgeUpdater();
+        } else {
+            document.getElementById('login-error').innerText = 'Invalid credentials';
+        }
+    })
+    .catch(err => {
+        console.error('Login error:', err);
+        document.getElementById('login-error').innerText = 'Login failed';
+    });
+}
+
+function logout() {
+    fetch('/api/index.php?action=logout', { method: 'POST' })
+    .then(() => {
+        sessionActive = false;
+        if (window.badgeInterval) clearInterval(window.badgeInterval);
+        document.getElementById('login-container').style.display = 'block';
+        document.getElementById('admin-content').style.display = 'none';
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+    });
+}
+
+// ==================== TAB HANDLING ====================
+function openTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablinks");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    if (evt) evt.currentTarget.className += " active";
+    if (tabName === 'pending') {
+        showPendingList();
+    } else if (tabName === 'messages') {
+        fetchMessages();
+    } else if (tabName === 'accesslogs') {
+        populateRouterFilter();
+        fetchAccessLogs();
+    }
+}
+
+// ==================== COUNTRY DATALIST ====================
+function populateCountryDatalist() {
+    const datalist = document.getElementById('countriesList');
+    if (!datalist) return;
+    datalist.innerHTML = '';
+    allowedCountries.forEach(country => {
+        const option = document.createElement('option');
+        option.value = country;
+        datalist.appendChild(option);
+    });
+}
+
+// ==================== EXISTING ROUTERS ====================
+function fetchRouters() {
+    if (!sessionActive) return;
+    fetch('/api/index.php?action=list_routers_admin')
+        .then(response => {
+            if (response.status === 401) { logout(); throw new Error('Session expired'); }
+            return response.json();
+        })
+        .then(routers => {
+            const tbody = document.querySelector('#routers-table tbody');
+            tbody.innerHTML = '';
+            routers.forEach(router => {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = router.id;
+                row.insertCell(1).innerText = router.name;
+                row.insertCell(2).innerText = router.country;
+                row.insertCell(3).innerText = router.ip_address;
+                // Use has_config instead of client_config
+                const hasConfig = router.has_config ? '✅' : '❌';
+                row.insertCell(4).innerHTML = hasConfig;
+                row.insertCell(5).innerText = router.created_at || '';
+                const actions = row.insertCell(6);
+                actions.innerHTML = `<button class="action-btn" onclick="editRouter(${router.id})">✏️ Edit</button>
+                                     <button class="action-btn" onclick="deleteRouter(${router.id})">🗑️ Delete</button>
+                                     <button class="action-btn" onclick="uploadConfig(${router.id})">📤 Upload Config</button>`;
+            });
+        })
+        .catch(err => console.error('Fetch routers error:', err));
+}
+
+function addRouter() {
+    const name = document.getElementById('name').value;
+    const country = document.getElementById('country').value.trim();
+    const ip_address = document.getElementById('ip_address').value;
+    const ssh_port = parseInt(document.getElementById('ssh_port').value);
+    const openvpn_port = parseInt(document.getElementById('openvpn_port').value);
+    const ssh_password = document.getElementById('ssh_password').value;
+    const configFile = document.getElementById('config_file').files[0];
+
+    if (!name || !country || !ip_address || !ssh_password) {
+        alert('Please fill all required fields');
+        return;
+    }
+    const isValidCountry = allowedCountries.some(c => c.toLowerCase() === country.toLowerCase());
+    if (!isValidCountry) {
+        alert('Invalid country/region. Please select from the allowed list.');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('country', country);
+    formData.append('ip_address', ip_address);
+    formData.append('ssh_port', ssh_port);
+    formData.append('openvpn_port', openvpn_port);
+    formData.append('ssh_password', ssh_password);
+    if (configFile) formData.append('client_config', configFile);
+
+    fetch('/api/index.php?action=add_router', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('Router added');
+            fetchRouters();
+            document.getElementById('name').value = '';
+            document.getElementById('country').value = '';
+            document.getElementById('ip_address').value = '';
+            document.getElementById('ssh_password').value = '';
+            document.getElementById('config_file').value = '';
+        } else {
+            alert('Error: ' + (result.error || 'Unknown'));
+        }
+    });
+}
+
+function editRouter(id) {
+    const name = prompt('New name:');
+    const country = prompt('New country/region:');
+    const ip = prompt('New domain/IP:');
+    const ssh_port = prompt('New SSH port (22):', '22');
+    const openvpn_port = prompt('New OpenVPN port (1194):', '1194');
+    const ssh_password = prompt('New SSH password (leave blank to keep unchanged):');
+    if (!name && !country && !ip && !ssh_password) return;
+    const updateData = { id: id };
+    if (name) updateData.name = name;
+    if (country) updateData.country = country;
+    if (ip) updateData.ip_address = ip;
+    if (ssh_port) updateData.ssh_port = parseInt(ssh_port);
+    if (openvpn_port) updateData.openvpn_port = parseInt(openvpn_port);
+    if (ssh_password) updateData.ssh_password = ssh_password;
+    fetch('/api/index.php?action=update_router', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('Router updated');
+            fetchRouters();
+        } else {
+            alert('Error: ' + (result.error || 'Unknown'));
+        }
+    });
+}
+
+function deleteRouter(id) {
+    if (!confirm('Delete router #' + id + '?')) return;
+    fetch('/api/index.php?action=delete_router', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('Router deleted');
+            fetchRouters();
+        } else {
+            alert('Error: ' + (result.error || 'Unknown'));
+        }
+    });
+}
+
+function uploadConfig(routerId) {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.ovpn,.conf';
+    fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('id', routerId);
+        formData.append('client_config', file);
+        fetch('/api/index.php?action=update_router', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                alert('Config uploaded');
+                fetchRouters(); // refresh to show ✅
+            } else {
+                alert('Error: ' + (result.error || 'Unknown'));
+            }
+        });
+    };
+    fileInput.click();
+}
+
+// ==================== PENDING APPROVALS ====================
+function showPendingList() {
+    currentListMode = 'pending';
+    document.getElementById('showPendingBtn').classList.add('active-toggle');
+    document.getElementById('showDeniedBtn').classList.remove('active-toggle');
+    document.getElementById('showApprovedBtn').classList.remove('active-toggle');
+    fetchPendingRouters();
+}
+
+function showDeniedList() {
+    currentListMode = 'denied';
+    document.getElementById('showDeniedBtn').classList.add('active-toggle');
+    document.getElementById('showPendingBtn').classList.remove('active-toggle');
+    document.getElementById('showApprovedBtn').classList.remove('active-toggle');
+    fetchDeniedRouters();
+}
+
+function showApprovedList() {
+    currentListMode = 'approved';
+    document.getElementById('showApprovedBtn').classList.add('active-toggle');
+    document.getElementById('showPendingBtn').classList.remove('active-toggle');
+    document.getElementById('showDeniedBtn').classList.remove('active-toggle');
+    fetchApprovedRouters();
+}
+
+function fetchPendingRouters() {
+    if (!sessionActive) return;
+    fetch('/api/index.php?action=list_pending_routers')
+        .then(res => res.json())
+        .then(pending => {
+            const tbody = document.querySelector('#pending-table tbody');
+            tbody.innerHTML = '';
+            pending.forEach(p => {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = p.id;
+                row.insertCell(1).innerText = p.name;
+                row.insertCell(2).innerText = p.country;
+                row.insertCell(3).innerText = p.ip_address;
+                row.insertCell(4).innerText = p.submitted_at;
+                row.insertCell(5).innerText = '';
+                const actions = row.insertCell(6);
+                actions.innerHTML = `<button class="action-btn" onclick="approveRouter(${p.id})">✅ Approve</button>
+                                     <button class="action-btn" onclick="denyRouter(${p.id})">❌ Deny</button>
+                                     <button class="delete-icon" onclick="deletePendingRouter(${p.id})">🗑️</button>`;
+            });
+        });
+}
+
+function fetchDeniedRouters() {
+    if (!sessionActive) return;
+    fetch('/api/index.php?action=list_denied_routers')
+        .then(res => res.json())
+        .then(denied => {
+            const tbody = document.querySelector('#pending-table tbody');
+            tbody.innerHTML = '';
+            denied.forEach(d => {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = d.id;
+                row.insertCell(1).innerText = d.name;
+                row.insertCell(2).innerText = d.country;
+                row.insertCell(3).innerText = d.ip_address;
+                row.insertCell(4).innerText = d.submitted_at;
+                row.insertCell(5).innerText = d.denied_at || '';
+                const actions = row.insertCell(6);
+                actions.innerHTML = `<button class="action-btn" onclick="approveDeniedRouter(${d.id})">🔄 Approve (Reconsider)</button>
+                                     <button class="delete-icon" onclick="deletePendingRouter(${d.id})">🗑️</button>`;
+            });
+        });
+}
+
+function fetchApprovedRouters() {
+    if (!sessionActive) return;
+    fetch('/api/index.php?action=list_approved_routers')
+        .then(res => res.json())
+        .then(approved => {
+            const tbody = document.querySelector('#pending-table tbody');
+            tbody.innerHTML = '';
+            approved.forEach(a => {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = a.id;
+                row.insertCell(1).innerText = a.name;
+                row.insertCell(2).innerText = a.country;
+                row.insertCell(3).innerText = a.ip_address;
+                row.insertCell(4).innerText = a.submitted_at;
+                row.insertCell(5).innerText = a.approved_at || '';
+                const actions = row.insertCell(6);
+                actions.innerHTML = `<button class="delete-icon" onclick="deletePendingRouter(${a.id})">🗑️</button>`;
+            });
+        });
+}
+
+function approveRouter(id) {
+    if (!confirm('Approve this router? It will be added to the main list.')) return;
+    fetch('/api/index.php?action=approve_router', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('Router approved');
+            if (currentListMode === 'pending') fetchPendingRouters();
+            updatePendingBadge();
+            fetchRouters();
+        } else alert('Error: ' + (result.error || 'Unknown'));
+    });
+}
+
+function denyRouter(id) {
+    if (!confirm('Deny this router submission?')) return;
+    fetch('/api/index.php?action=deny_router', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('Router denied');
+            if (currentListMode === 'pending') fetchPendingRouters();
+            updatePendingBadge();
+        } else alert('Error: ' + (result.error || 'Unknown'));
+    });
+}
+
+function approveDeniedRouter(id) {
+    if (!confirm('Approve this previously denied router? It will be added to the main list.')) return;
+    fetch('/api/index.php?action=approve_denied_router', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('Router approved and added to main list');
+            if (currentListMode === 'denied') fetchDeniedRouters();
+            updatePendingBadge();
+            fetchRouters();
+        } else alert('Error: ' + (result.error || 'Unknown'));
+    });
+}
+
+function deletePendingRouter(id) {
+    if (!confirm('Delete this router submission permanently?')) return;
+    fetch('/api/index.php?action=delete_pending_router', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert('Submission deleted');
+            if (currentListMode === 'pending') fetchPendingRouters();
+            else if (currentListMode === 'denied') fetchDeniedRouters();
+            else if (currentListMode === 'approved') fetchApprovedRouters();
+            updatePendingBadge();
+        } else alert('Error: ' + (result.error || 'Unknown'));
+    });
+}
+
+function clearAllSubmissions() {
+    if (!confirm('⚠️ Delete ALL pending, denied, approved submissions? Cannot be undone.')) return;
+    fetch('/api/index.php?action=clear_all_submissions', { method: 'POST' })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                alert(`Deleted ${result.deleted} submission(s).`);
+                if (currentListMode === 'pending') fetchPendingRouters();
+                else if (currentListMode === 'denied') fetchDeniedRouters();
+                else if (currentListMode === 'approved') fetchApprovedRouters();
+                updatePendingBadge();
+            } else alert('Error: ' + (result.error || 'Unknown'));
+        });
+}
+
+// ==================== MESSAGES ====================
+function fetchMessages() {
+    if (!sessionActive) return;
+    fetch('/api/index.php?action=list_messages')
+        .then(res => res.json())
+        .then(messages => {
+            const tbody = document.querySelector('#messages-table tbody');
+            tbody.innerHTML = '';
+            unreadMessagesCount = 0;
+            messages.forEach(msg => {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = msg.id;
+                row.insertCell(1).innerText = msg.name;
+                row.insertCell(2).innerText = msg.email || '';
+                row.insertCell(3).innerText = msg.message;
+                row.insertCell(4).innerText = msg.created_at;
+                const isRead = msg.is_read == 1;
+                row.insertCell(5).innerHTML = isRead ? 'Read' : '<strong>Unread</strong>';
+                if (!isRead) {
+                    unreadMessagesCount++;
+                    row.classList.add('unread-row');
+                }
+                const actions = row.insertCell(6);
+                if (!isRead) {
+                    actions.innerHTML = `<button class="action-btn" onclick="markMessageRead(${msg.id})">✅ Mark Read</button> <button class="delete-icon" onclick="deleteMessage(${msg.id})">🗑️</button>`;
+                } else {
+                    actions.innerHTML = `<button class="delete-icon" onclick="deleteMessage(${msg.id})">🗑️</button>`;
+                }
+            });
+            updateMessagesBadge();
+        });
+}
+
+function updateMessagesBadge() {
+    if (!sessionActive) return;
+    fetch('/api/index.php?action=count_unread_messages')
+        .then(res => res.json())
+        .then(data => {
+            unreadMessagesCount = data.count;
+            const msgBtn = document.getElementById('messagesTabBtn');
+            let badge = msgBtn.querySelector('.badge');
+            if (badge) badge.remove();
+            if (unreadMessagesCount > 0) {
+                badge = document.createElement('span');
+                badge.className = 'badge';
+                badge.innerText = unreadMessagesCount;
+                msgBtn.appendChild(badge);
+            }
+        })
+        .catch(err => console.error('Failed to fetch unread count:', err));
+}
+
+function markMessageRead(id) {
+    fetch('/api/index.php?action=mark_message_read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(() => fetchMessages());
+}
+
+function deleteMessage(id) {
+    if (!confirm('Delete this message?')) return;
+    fetch('/api/index.php?action=delete_message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(() => fetchMessages());
+}
+
+function deleteAllMessages() {
+    if (!confirm('Delete ALL messages? Cannot be undone.')) return;
+    fetch('/api/index.php?action=delete_all_messages', { method: 'POST' })
+        .then(() => fetchMessages());
+}
+
+// ==================== ACCESS LOGS ====================
+function populateRouterFilter() {
+    fetch('/api/index.php?action=list_routers_admin')
+        .then(res => res.json())
+        .then(routers => {
+            const select = document.getElementById('logRouterFilter');
+            select.innerHTML = '<option value="">All Routers</option>';
+            routers.forEach(router => {
+                const opt = document.createElement('option');
+                opt.value = router.id;
+                opt.textContent = router.name;
+                select.appendChild(opt);
+            });
+        });
+}
+
+function fetchAccessLogs() {
+    const routerId = document.getElementById('logRouterFilter').value;
+    let url = '/api/index.php?action=list_access_logs';
+    if (routerId) url += '&router_id=' + routerId;
+    fetch(url)
+        .then(res => res.json())
+        .then(logs => {
+            const tbody = document.querySelector('#accesslogs-table tbody');
+            tbody.innerHTML = '';
+            logs.forEach(log => {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = log.id;
+                row.insertCell(1).innerText = log.router_name;
+                row.insertCell(2).innerText = log.username;
+                row.insertCell(3).innerText = log.assigned_at;
+            });
+        });
+}
+
+function deleteAllAccessLogs() {
+    if (!confirm('Delete ALL access logs? Cannot be undone.')) return;
+    fetch('/api/index.php?action=delete_all_access_logs', { method: 'POST' })
+        .then(() => fetchAccessLogs());
+}
+
+// ==================== BADGE UPDATERS ====================
+function updatePendingBadge() {
+    fetch('/api/index.php?action=count_pending_routers')
+        .then(res => res.json())
+        .then(data => {
+            const count = data.count;
+            const pendingBtn = document.getElementById('pendingTabBtn');
+            let badge = pendingBtn.querySelector('.badge');
+            if (badge) badge.remove();
+            if (count > 0) {
+                badge = document.createElement('span');
+                badge.className = 'badge';
+                badge.innerText = count;
+                pendingBtn.appendChild(badge);
+            }
+        });
+}
+
+function startBadgeUpdater() {
+    if (window.badgeInterval) clearInterval(window.badgeInterval);
+    window.badgeInterval = setInterval(() => {
+        if (sessionActive) {
+            updatePendingBadge();
+            updateMessagesBadge();
+            if (document.getElementById('messages').style.display === 'block') fetchMessages();
+            if (document.getElementById('accesslogs').style.display === 'block') fetchAccessLogs();
+        }
+    }, 30000);
+}
+
+// ==================== SESSION CHECK ====================
+function checkSession() {
+    fetch('/api/index.php?action=list_routers_admin')
+        .then(res => {
+            if (res.status === 401) throw new Error('Not logged in');
+            return res.json();
+        })
+        .then(() => {
+            sessionActive = true;
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('admin-content').style.display = 'block';
+            populateCountryDatalist();
+            fetchRouters();
+            updatePendingBadge();
+            updateMessagesBadge();
+            document.getElementById('defaultOpen').click();
+            startBadgeUpdater();
+        })
+        .catch(() => {
+            document.getElementById('login-container').style.display = 'block';
+            document.getElementById('admin-content').style.display = 'none';
+        });
+}
+
+checkSession();
+setInterval(() => { if (sessionActive) fetchRouters(); }, 10000);
+</script>
+</body>
+</html>
